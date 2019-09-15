@@ -50,9 +50,10 @@ services:
     environment:
       SPRING_APPLICATION_NAME: config-server
       SERVER_PORT: 8080
-      SPRING_CLOUD_CONFIG_SERVER_GIT_URI: /git-volume
+      SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCHLOCATIONS: /git-volume
+      SPRING_PROFILES_ACTIVE: native
     volumes:
-      - C:\Users\marcus\source\repos\microservices\git-config:/git-volume
+      - ./git-config:/git-volume
   product-catalog:
     build: 
       context: ./product-catalog
