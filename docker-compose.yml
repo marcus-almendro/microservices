@@ -1,0 +1,100 @@
+version: '3'
+services:
+  mysql:
+    image: mysql:5.6.23
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: admin
+  eureka-server:
+    build: 
+      context: ./eureka-server
+      args: 
+        JAR_PATH: ./target/eureka-server-0.0.1-SNAPSHOT.jar
+    image: microservices-eureka-server:latest
+    ports:
+      - "8700:8080"
+    command: /wait-for mysql:3306 -t 900 -- java -jar app.jar
+    environment:
+      SPRING_APPLICATION_NAME: eureka-server
+      SERVER_PORT: 8080
+      EUREKA_INSTANCE_HOSTNAME: localhost
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://localhost:8080/eureka
+  zuul-gateway:
+    build: 
+      context: ./zuul-gateway
+      args: 
+        JAR_PATH: ./target/zuul-gateway-0.0.1-SNAPSHOT.jar
+    image: microservices-zuul-gateway:latest
+    ports:
+      - "8900:8080"
+    command: /wait-for eureka-server:8080 -t 900 -- java -jar app.jar
+    environment:
+      SPRING_APPLICATION_NAME: zuul-gateway
+      SERVER_PORT: 8080 
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8080/eureka
+      SPRING_ZIPKIN_BASEURL: https://zipkin:9411/
+  zipkin:
+    image: openzipkin/zipkin:latest
+    ports:
+      - "9411:9411"
+  config-server:
+    build: 
+      context: ./config-server
+      args: 
+        JAR_PATH: ./target/config-server-0.0.1-SNAPSHOT.jar
+    image: microservices-config-server:latest
+    ports:
+      - "8000:8080"
+    command: /wait-for eureka-server:8080 -t 900 -- java -jar app.jar
+    environment:
+      SPRING_APPLICATION_NAME: config-server
+      SERVER_PORT: 8080
+      SPRING_CLOUD_CONFIG_SERVER_GIT_URI: /git-volume
+    volumes:
+      - C:\Users\marcus\source\repos\microservices\git-config:/git-volume
+  product-catalog:
+    build: 
+      context: ./product-catalog
+      args: 
+        JAR_PATH: ./target/product-catalog-0.0.1-SNAPSHOT.jar
+    image: microservices-product-catalog:latest
+    ports:
+      - "8001:8080"
+    command: /wait-for config-server:8080 -t 900 -- java -jar app.jar
+    environment:
+      SPRING_APPLICATION_NAME: product-catalog
+      SERVER_PORT: 8080
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8080
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/productDB?createDatabaseIfNotExist=true
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8080/eureka
+      SPRING_ZIPKIN_BASEURL: http://zipkin:9411/
+  product-catalog-2:
+    image: microservices-product-catalog:latest
+    ports:
+      - "8002:8080"
+    command: /wait-for product-catalog:8080 -t 900 -- java -jar app.jar
+    environment:
+      SPRING_APPLICATION_NAME: product-catalog
+      SERVER_PORT: 8080
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8080
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/productDB
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8080/eureka
+      SPRING_ZIPKIN_BASEURL: http://zipkin:9411/
+  order-management:
+    build: 
+      context: ./order-management
+      args: 
+        JAR_PATH: ./target/order-management-0.0.1-SNAPSHOT.jar
+    image: microservices-order-management:latest
+    ports:
+      - "8081:8080"
+    command: /wait-for eureka-server:8080 -t 900 -- java -jar app.jar
+    environment:
+      SPRING_APPLICATION_NAME: order-management
+      SERVER_PORT: 8080
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8080/eureka
+      SPRING_ZIPKIN_BASEURL: http://zipkin:9411/
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "*"
